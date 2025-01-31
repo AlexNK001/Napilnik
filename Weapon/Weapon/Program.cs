@@ -20,28 +20,20 @@ namespace Weapon
 
         public Weapon(int damage, int bulletsCount)
         {
-            if (damage > 0)
-                _damage = damage;
-            else
-                throw new ArgumentOutOfRangeException();
-
-            if (bulletsCount > 0)
-                _bullets = bulletsCount;
-            else
-                throw new ArgumentOutOfRangeException();
+            _damage = damage > 0 ? damage : throw new ArgumentOutOfRangeException(nameof(damage));
+            _bullets = bulletsCount > 0 ? bulletsCount : throw new ArgumentOutOfRangeException(nameof(bulletsCount));
         }
 
         public void Fire(Player player)
         {
-            if (_bullets > 0)
-            {
-                player.TakeDamage(_damage);
-                _bullets--;
-            }
-            else
-            {
-                throw new InvalidOperationException();
-            }
+            if (player == null)
+                throw new ArgumentNullException(nameof(player));
+
+            if (_bullets < 0)
+                throw new InvalidOperationException(nameof(_bullets));
+
+            player.TakeDamage(_damage);
+            _bullets--;
         }
     }
 
@@ -54,7 +46,7 @@ namespace Weapon
             if (health > 0)
                 _health = health;
             else
-                throw new ArgumentOutOfRangeException();
+                throw new ArgumentOutOfRangeException(nameof(health));
         }
 
         public void TakeDamage(int damage)
@@ -62,7 +54,7 @@ namespace Weapon
             if (damage > 0)
                 _health -= damage;
             else
-                throw new ArgumentOutOfRangeException();
+                throw new ArgumentOutOfRangeException(nameof(damage));
         }
     }
 
@@ -72,14 +64,14 @@ namespace Weapon
 
         public Bot(Weapon weapon)
         {
-            if (weapon != null)
-                _weapon = weapon;
-            else
-                throw new ArgumentNullException();
+            _weapon = weapon ?? throw new ArgumentNullException(nameof(weapon));
         }
 
         public void OnSeePlayer(Player player)
         {
+            if (player == null)
+                throw new ArgumentNullException(nameof(player));
+
             _weapon.Fire(player);
         }
     }
