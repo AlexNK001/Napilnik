@@ -1,0 +1,7 @@
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\bin\Debug\internet store.exe.config
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\bin\Debug\internet store.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\bin\Debug\internet store.pdb
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\obj\Debug\internet store.csproj.AssemblyReference.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\obj\Debug\internet store.csproj.CoreCompileInputs.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\obj\Debug\internet store.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\internet store\internet store\obj\Debug\internet store.pdb
