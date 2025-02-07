@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace online_store
 {
@@ -7,11 +8,9 @@ namespace online_store
     {
         private static void Main()
         {
-            Good iPhone12 = new Good("IPhone 12");
-            Good iPhone11 = new Good("IPhone 11");
-
             Warehouse warehouse = new Warehouse();
-
+            Product iPhone12 = new Product("iPhone12");
+            Product iPhone11 = new Product("iPhone11");
             Shop shop = new Shop(warehouse);
 
             warehouse.Delive(iPhone12, 10);
@@ -21,11 +20,11 @@ namespace online_store
             Console.WriteLine(warehouse.GetInfo());
 
             Cart cart = shop.Cart();
-            cart.TakeFromWarehouse(iPhone12, 4);
+            cart.AcceptProducts(iPhone12, 4);
 
             try
             {
-                cart.TakeFromWarehouse(iPhone11, 3);
+                cart.AcceptProducts(iPhone11, 3);
             }
             catch
             {
@@ -35,11 +34,11 @@ namespace online_store
             Console.WriteLine("Вывод всех товаров в корзине");
             Console.WriteLine(cart.GetInfo());
 
-            Console.WriteLine(cart.Order().Paylink);
+            Console.WriteLine(cart.PlaceOrder().Paylink);
 
             try
             {
-                cart.TakeFromWarehouse(iPhone12, 9);
+                cart.AcceptProducts(iPhone12, 9);
             }
             catch
             {
@@ -54,175 +53,299 @@ namespace online_store
 
         public Shop(Warehouse warehouse)
         {
-            _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
+            _warehouse = warehouse??throw new ArgumentNullException(nameof(warehouse));
         }
 
         public Cart Cart()
         {
+            if(_warehouse == null)
+                throw new ArgumentNullException(nameof(_warehouse));
+
             return new Cart(_warehouse);
         }
     }
 
-    public class Warehouse
+    public class Warehouse : IWarehouse
     {
-        private readonly Dictionary<string, ProductCell> _cells;
+        private readonly Dictionary<string, int> _productsToOrder;
+        private readonly Dictionary<string, int> _orderedProducts;
 
         public Warehouse()
         {
-            _cells = new Dictionary<string, ProductCell>();
+            _productsToOrder = new Dictionary<string, int>();
+            _orderedProducts = new Dictionary<string, int>();
         }
 
-        public void Delive(Good product, int productCount)
+        public void Delive(Product product, int count)
         {
-            if (product == null)
-                throw new ArgumentNullException(nameof(product));
+            PreventIncorrectProduct(product);
+            PreventIncorrectProductCount(count);
 
-            if (productCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(productCount));
+            string name = product.Name;
 
-            string productName = product.Name;
-
-            if (_cells.ContainsKey(productName))
-                _cells[productName].AddProduct(productCount);
+            if (_productsToOrder.ContainsKey(name))
+                _productsToOrder[name] += count;
             else
-                _cells.Add(productName, new ProductCell(productName, productCount));
+                _productsToOrder.Add(name, count);
         }
 
-        public void Get(string productName, int productCount)
+        public bool TryReserve(Product product, int count)
         {
-            if (productName == null)
-                throw new ArgumentNullException(nameof(productName));
+            PreventIncorrectProduct(product);
+            PreventIncorrectProductCount(count);
+            PreventMissingProduct(_productsToOrder, product);
 
-            if (productCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(productCount));
+            return _productsToOrder[product.Name] >= count;
+        }
 
-            if (_cells.ContainsKey(productName))
+        public void Reserve(Product product, int count)
+        {
+            PreventIncorrectProduct(product);
+            PreventIncorrectProductCount(count);
+            PreventMissingProduct(_productsToOrder, product);
+            PreventProductShortages(_productsToOrder, product, count);
+
+            Swap(_productsToOrder, _orderedProducts, product, count);
+        }
+
+        public void CancelReservation(Product product, int count)
+        {
+            PreventIncorrectProduct(product);
+            PreventIncorrectProductCount(count);
+            PreventMissingProduct(_orderedProducts, product);
+            PreventProductShortages(_orderedProducts, product, count);
+
+            Swap(_orderedProducts, _productsToOrder, product, count);
+        }
+
+        public void DeleteProducts(IReadOnlyDictionary<string, int> products)
+        {
+            if (products == null)
+                throw new ArgumentNullException(nameof(products));
+
+            if (products.Count == 0)
+                throw new InvalidOperationException();
+
+            if (products.Any(product => product.Value <= 0))
+                throw new InvalidOperationException();
+
+            foreach (var item in products.Keys)
             {
-                if (_cells[productName].Count >= productCount)
+                if (_orderedProducts.ContainsKey(item) && _orderedProducts[item] >= products[item])
                 {
-                    _cells[productName].GetProduct(productCount);
+                    _orderedProducts[item] -= products[item];
+
+                    if (_orderedProducts[item] == 0)
+                    {
+                        _orderedProducts.Remove(item);
+                    }
                 }
                 else
                 {
-                    throw new ArgumentOutOfRangeException(nameof(productCount));
+                    throw new InvalidOperationException();
                 }
             }
-            else
-            {
-                throw new ArgumentOutOfRangeException(nameof(productName));
-            }
         }
 
-        public string GetInfo()
-        {
-            string info = "Информация о складе\n";
-
-            if (_cells.Count > 0)
-            {
-                foreach (string name in _cells.Keys)
-                    info += $"{name} {_cells[name].Count}\n";
-            }
-            else
-            {
-                info += "Склад пуст";
-            }
-
-            return info;
-        }
-    }
-
-    public class Good
-    {
-        public Good(string productName)
-        {
-            Name = productName;
-        }
-
-        public string Name { get; }
-    }
-
-    public class Cart : IReadOnlyCart
-    {
-        private readonly Dictionary<string, ProductCell> _products;
-        private readonly Warehouse _warehouse;
-
-        public Cart(Warehouse warehouse)
-        {
-            _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
-            _products = new Dictionary<string, ProductCell>();
-            Paylink = "Paylink/jhfdkgs6854378";
-        }
-
-        public string Paylink { get; }
-
-        public void TakeFromWarehouse(Good product, int productCount)
+        private void PreventIncorrectProduct(Product product)
         {
             if (product == null)
                 throw new ArgumentNullException(nameof(product));
 
-            if (productCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(productCount));
-
-            string productName = product.Name;
-            ProductCell currentCell;
-
-            if (_products.ContainsKey(productName))
-                currentCell = _products[productName];
-            else
-                currentCell = new ProductCell(productName, productCount);
-
-            _warehouse.Get(productName, productCount);
-            _products.Add(productName, currentCell);
+            if (product.Name == null)
+                throw new ArgumentNullException(nameof(product.Name));
         }
 
-        public IReadOnlyCart Order()
+        private void PreventIncorrectProductCount(int count)
         {
-            return this;
+            if (count < 0)
+                throw new ArgumentOutOfRangeException(nameof(count));
+
+            if (count == 0)
+                throw new InvalidOperationException();
+        }
+
+        private void PreventMissingProduct(Dictionary<string, int> products, Product product)
+        {
+            if (products.ContainsKey(product.Name) == false)
+                throw new InvalidOperationException();
+        }
+
+        private void PreventProductShortages(Dictionary<string, int> products, Product product, int count)
+        {
+            if (products[product.Name] <= count)
+                throw new InvalidOperationException();
         }
 
         public string GetInfo()
         {
-            string info = $"Информация о продуктовой карте\n";
+            string info = "Информация о складе:\nТовары на заказ:\n";
+            info += CollectInformation(_productsToOrder);
+            info += "Заказанные товары:\n";
+            info += CollectInformation(_orderedProducts);
 
-            foreach (string name in _products.Keys)
-                info += $"{name} {_products[name].Count}\n";
+            return info;
+        }
+
+        private void Swap(Dictionary<string, int> first, Dictionary<string, int> second, Product product, int count)
+        {
+            string name = product.Name;
+
+            first[name] -= count;
+
+            if (first[name] == 0)
+                first.Remove(name);
+
+            if (second.ContainsKey(name))
+                second[name] += count;
+            else
+                second.Add(name, count);
+        }
+
+        private string CollectInformation(Dictionary<string, int> collection)
+        {
+            string info = string.Empty;
+
+            if (collection.Count > 0)
+            {
+                foreach (var pair in collection)
+                    info += $"{pair.Key} {pair.Value}\n";
+            }
+            else
+            {
+                info += "Коллекция пуста.\n";
+            }
 
             return info;
         }
     }
 
-    public class ProductCell
+    public interface IWarehouse
     {
-        private int _count;
+        bool TryReserve(Product product, int count);
+        void Reserve(Product product, int count);
+        void CancelReservation(Product product, int count);
+        void DeleteProducts(IReadOnlyDictionary<string, int> products);
+    }
 
-        public ProductCell(string productName, int productCount)
+    public class Cart
+    {
+        private readonly IWarehouse _warehouse;
+        private readonly Dictionary<string, int> _products;
+
+        public Cart(IWarehouse warehouse)
         {
-            Name = productName ?? throw new ArgumentNullException(nameof(productName));
-            _count = productCount > 0 ? productCount : throw new ArgumentOutOfRangeException(nameof(productCount));
+            _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
+            _products = new Dictionary<string, int>();
         }
 
-        public string Name { get; }
-        public int Count => _count;
-
-        public void AddProduct(int productCount)
+        public void AcceptProducts(Product product, int count)
         {
-            if (productCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(productCount));
+            if (product == null)
+                throw new ArgumentNullException(nameof(product));
 
-            _count += productCount;
+            if (count < 0)
+                throw new ArgumentOutOfRangeException(nameof(count));
+
+            if (_products.ContainsKey(product.Name))
+                count -= _products[product.Name];
+
+            if (count > 0)
+            {
+                if (_warehouse.TryReserve(product, count))
+                {
+                    _warehouse.Reserve(product, count);
+                    AddProduct(product, count);
+                }
+                else
+                {
+                    throw new InvalidOperationException();
+                }
+            }
+            else if (count < 0)
+            {
+                count = Math.Abs(count);
+                _warehouse.CancelReservation(product, count);
+                RemoveProducts(product, count);
+            }
         }
 
-        public void GetProduct(int productCount)
+        public string GetInfo()
         {
-            if (_count - productCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(productCount));
+            string info = "Информация о корзине.\n";
 
-            _count -= productCount;
+            if (_products.Count == 0)
+            {
+                info += "Корзина пуста.";
+            }
+            else
+            {
+                foreach (var pair in _products)
+                    info += $"{pair.Key} {pair.Value}\n";
+            }
+
+            return info;
+        }
+
+        public Order PlaceOrder()
+        {
+            if (_warehouse == null)
+                throw new ArgumentNullException(nameof(_warehouse));
+
+            if (_products.Count == 0)
+                throw new InvalidOperationException();
+
+            _warehouse.DeleteProducts(_products);
+            var products = _products;
+            _products.Clear();
+
+            return new Order(products);
+        }
+
+        private void AddProduct(Product product, int count)
+        {
+            string name = product.Name;
+
+            if (_products.ContainsKey(name))
+                _products[name] += count;
+            else
+                _products.Add(name, count);
+        }
+
+        private void RemoveProducts(Product product, int count)
+        {
+            _products[product.Name] -= count;
+
+            if (_products[product.Name] == 0)
+                _products.Remove(product.Name);
         }
     }
 
-    public interface IReadOnlyCart
+    public class Product
     {
-        string Paylink { get; }
+        public Product(string name)
+        {
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+        }
+
+        public string Name { get; }
+    }
+
+    public class Order
+    {
+        private readonly IReadOnlyDictionary<string, int> _products;
+
+        public Order(IReadOnlyDictionary<string, int> products)
+        {
+            _products = products ?? throw new ArgumentNullException(nameof(products));
+
+            foreach (int count in products.Values)
+            {
+                if (count < 0)
+                    throw new ArgumentOutOfRangeException(nameof(count));
+            }
+        }
+
+        public string Paylink => "fdsfsdf767678";
     }
 }
