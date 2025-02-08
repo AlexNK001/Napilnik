@@ -1,27 +1,67 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-//Защищённый логер даёт функционал, что логер пишется только по пятницам (такая условность).
 
-//Представьте класс Pathfinder у которого есть зависимость от условного ILogger,
-//в процессе своей работы он что-то пишет в лог. Что не принципиально.
-//Сделайте в нём один метод Find который только пишет в лог через своего логера.
-
-//Перепроектируйте систему логирования так, что бы у меня было 5 объектов класса Pathfinder.
-//1) Пишет лог в файл.
-//2) Пишет лог в консоль.
-//3) Пишет лог в файл по пятницам.
-//4) Пишет лог в консоль по пятницам.
-//5) Пишет лог в консоль а по пятницам ещё и в файл.
 namespace Logging
 {
     public class Program
     {
         private static void Main()
         {
+            ILogger[] loggers = new ILogger[] 
+            { 
+                LoggerCreator.CreateLoggerToFile(), 
+                LoggerCreator.CreateLoggerToConsole(), 
+                LoggerCreator.CreateSecureLogWritter(LoggerCreator.CreateLoggerToFile()), 
+                LoggerCreator.CreateSecureLogWritter(LoggerCreator.CreateLoggerToConsole()), 
+                LoggerCreator.CreateCompositeLogWritter(
+                    LoggerCreator.CreateLoggerToConsole(),
+                    LoggerCreator.CreateSecureLogWritter(LoggerCreator.CreateLoggerToFile())) 
+            };
+
+            Pathfinder[] pathfinders = new Pathfinder[loggers.Length];
+
+            for (int i = 0; i < loggers.Length; i++)
+            {
+                Console.SetCursorPosition(0, i);
+                Console.Write($"{i}) ");
+                pathfinders[i] = new Pathfinder(loggers[i]);
+                pathfinders[i].Find($"{i} Hellow world!");
+            }
+
+            Console.WriteLine();
+        }
+    }
+
+    public class LoggerCreator
+    {
+        public static FileLogWritter CreateLoggerToFile() 
+        {
+            return new FileLogWritter(); 
+        }
+
+        public static ConsoleLogWritter CreateLoggerToConsole() 
+        {
+            return new ConsoleLogWritter(); 
+        }
+
+        public static SecureLogWritter CreateSecureLogWritter(ILogger logger)
+        {
+            if (logger == null)
+                throw new ArgumentNullException(nameof(logger));
+
+            return new SecureLogWritter(logger);
+        }
+
+        public static CompositeLogWritter CreateCompositeLogWritter(params ILogger[] loggers)
+        {
+            if (loggers == null)
+                throw new ArgumentNullException(nameof(loggers));
+
+            if (loggers.Any(logger => logger == null))
+                throw new ArgumentNullException($"The {nameof(loggers)} contains an element equal to null.");
+
+            return new CompositeLogWritter(loggers);
         }
     }
 
@@ -50,65 +90,57 @@ namespace Logging
 
     public class ConsoleLogWritter : ILogger
     {
-        //public virtual void WriteError(string message)
         public void WriteError(string message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            Console.WriteLine(message);
+            Console.WriteLine($"{this} {message}");
         }
     }
 
     public class FileLogWritter : ILogger
     {
-        //public virtual void WriteError(string message)
         public void WriteError(string message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
             File.WriteAllText("log.txt", message);
+            Console.WriteLine($"{this} {message}");
         }
     }
 
-    //public class SecureConsoleLogWritter : ConsoleLogWritter
-    public class SecureConsoleLogWritter : ILogger //: ConsoleLogWritter
+    public class SecureLogWritter : ILogger
     {
         private readonly ILogger _logger;
-        //public override void WriteError(string message)
-        //{
-        //    if (DateTime.Now.DayOfWeek == DayOfWeek.Friday)
-        //    {
-        //        base.WriteError(message);
-        //    }
-        //}
+
+        public SecureLogWritter(ILogger logger)
+        {
+            _logger = logger;
+        }
+
         public void WriteError(string message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            if (DateTime.Now.DayOfWeek == DayOfWeek.Friday)
-            {
-                _logger.WriteError(message);
-            }
+            if (DateTime.Now.DayOfWeek == DayOfWeek.Saturday)
+                _logger.WriteError($"{this} {message}");
         }
     }
 
-    public class CompositLogWritter : ILogger
+    public class CompositeLogWritter : ILogger
     {
         private readonly ILogger[] _loggers;
 
-        public CompositLogWritter(params ILogger[] loggers)
+        public CompositeLogWritter(params ILogger[] loggers)
         {
             if (loggers == null)
                 throw new ArgumentNullException(nameof(loggers));
 
             if (loggers.Any(logger => logger == null))
-            {
-                string errorMessage = $"The {nameof(loggers)} contains an element equal to null.";
-                throw new ArgumentNullException(errorMessage);
-            }
+                throw new ArgumentNullException($"The {nameof(loggers)} contains an element equal to null.");
 
             _loggers = loggers;
         }

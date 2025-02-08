@@ -1,0 +1,7 @@
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\bin\Debug\Logging.exe.config
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\bin\Debug\Logging.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\bin\Debug\Logging.pdb
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\obj\Debug\Logging.csproj.AssemblyReference.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\obj\Debug\Logging.csproj.CoreCompileInputs.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\obj\Debug\Logging.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\Logging\Logging\obj\Debug\Logging.pdb
