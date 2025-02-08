@@ -224,7 +224,12 @@ namespace online_store
             if (count < 0)
                 throw new ArgumentOutOfRangeException(nameof(count));
 
-            if (_warehouse.CanReserve(product, count))
+            int totalQuantity = count;
+
+            if (_products.ContainsKey(product.Name))
+                totalQuantity += _products[product.Name];
+
+            if (_warehouse.CanReserve(product, totalQuantity))
                 AddProduct(product, count);
         }
 
