@@ -20,15 +20,15 @@ namespace online_store
             Console.WriteLine(warehouse.GetInfo());
 
             Cart cart = shop.Cart();
-            cart.AcceptProducts(iPhone12, 4);
+            cart.AddProducts(iPhone12, 4);
 
             try
             {
-                cart.AcceptProducts(iPhone11, 3);
+                cart.AddProducts(iPhone11, 3);
             }
             catch
             {
-                Console.WriteLine("Ошибка 1/2 так, как нет нужного количества товара на складе");
+                Console.WriteLine("Ошибка 1/3 так, как нет нужного количества товара на складе");
             }
 
             Console.WriteLine("Вывод всех товаров в корзине");
@@ -38,11 +38,27 @@ namespace online_store
 
             try
             {
-                cart.AcceptProducts(iPhone12, 9);
+                cart.AddProducts(iPhone12, 9);
             }
             catch
             {
-                Console.WriteLine("Ошибка 2/2, после заказа со склада убираются заказанные товары");
+                Console.WriteLine("Ошибка 2/3, после заказа со склада убираются заказанные товары");
+            }
+
+            BreakWarehouse(warehouse);
+        }
+
+        private static void BreakWarehouse(Warehouse warehouse)
+        {
+            Dictionary<string, int> nonExistentProducts = new Dictionary<string, int> { { "name1", 3 }, { "name2", 5 } };
+
+            try
+            {
+                warehouse.DeleteProducts(nonExistentProducts);
+            }
+            catch
+            {
+                Console.WriteLine("Ошибка 3/3, склад не может удалить несуществующие товары");
             }
         }
     }
@@ -53,12 +69,12 @@ namespace online_store
 
         public Shop(Warehouse warehouse)
         {
-            _warehouse = warehouse??throw new ArgumentNullException(nameof(warehouse));
+            _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
         }
 
         public Cart Cart()
         {
-            if(_warehouse == null)
+            if (_warehouse == null)
                 throw new ArgumentNullException(nameof(_warehouse));
 
             return new Cart(_warehouse);
@@ -67,13 +83,11 @@ namespace online_store
 
     public class Warehouse : IWarehouse
     {
-        private readonly Dictionary<string, int> _productsToOrder;
-        private readonly Dictionary<string, int> _orderedProducts;
+        private readonly Dictionary<string, int> _products;
 
         public Warehouse()
         {
-            _productsToOrder = new Dictionary<string, int>();
-            _orderedProducts = new Dictionary<string, int>();
+            _products = new Dictionary<string, int>();
         }
 
         public void Delive(Product product, int count)
@@ -83,39 +97,20 @@ namespace online_store
 
             string name = product.Name;
 
-            if (_productsToOrder.ContainsKey(name))
-                _productsToOrder[name] += count;
+            if (_products.ContainsKey(name))
+                _products[name] += count;
             else
-                _productsToOrder.Add(name, count);
+                _products.Add(name, count);
         }
 
-        public bool TryReserve(Product product, int count)
+        public bool CanReserve(Product product, int count)
         {
             PreventIncorrectProduct(product);
             PreventIncorrectProductCount(count);
-            PreventMissingProduct(_productsToOrder, product);
+            PreventMissingProduct(_products, product);
+            PreventProductShortages(_products, product, count);
 
-            return _productsToOrder[product.Name] >= count;
-        }
-
-        public void Reserve(Product product, int count)
-        {
-            PreventIncorrectProduct(product);
-            PreventIncorrectProductCount(count);
-            PreventMissingProduct(_productsToOrder, product);
-            PreventProductShortages(_productsToOrder, product, count);
-
-            Swap(_productsToOrder, _orderedProducts, product, count);
-        }
-
-        public void CancelReservation(Product product, int count)
-        {
-            PreventIncorrectProduct(product);
-            PreventIncorrectProductCount(count);
-            PreventMissingProduct(_orderedProducts, product);
-            PreventProductShortages(_orderedProducts, product, count);
-
-            Swap(_orderedProducts, _productsToOrder, product, count);
+            return _products[product.Name] >= count;
         }
 
         public void DeleteProducts(IReadOnlyDictionary<string, int> products)
@@ -129,20 +124,20 @@ namespace online_store
             if (products.Any(product => product.Value <= 0))
                 throw new InvalidOperationException();
 
-            foreach (var item in products.Keys)
+            foreach (var name in products.Keys)
             {
-                if (_orderedProducts.ContainsKey(item) && _orderedProducts[item] >= products[item])
-                {
-                    _orderedProducts[item] -= products[item];
-
-                    if (_orderedProducts[item] == 0)
-                    {
-                        _orderedProducts.Remove(item);
-                    }
-                }
-                else
-                {
+                if ((_products.ContainsKey(name) && _products[name] >= products[name]) == false)
                     throw new InvalidOperationException();
+            }
+
+            foreach (var name in products.Keys)
+            {
+                if (_products.ContainsKey(name) && _products[name] >= products[name])
+                {
+                    _products[name] -= products[name];
+
+                    if (_products[name] == 0)
+                        _products.Remove(name);
                 }
             }
         }
@@ -179,27 +174,10 @@ namespace online_store
 
         public string GetInfo()
         {
-            string info = "Информация о складе:\nТовары на заказ:\n";
-            info += CollectInformation(_productsToOrder);
-            info += "Заказанные товары:\n";
-            info += CollectInformation(_orderedProducts);
+            string info = "Информация о складе:";
+            info += CollectInformation(_products);
 
             return info;
-        }
-
-        private void Swap(Dictionary<string, int> first, Dictionary<string, int> second, Product product, int count)
-        {
-            string name = product.Name;
-
-            first[name] -= count;
-
-            if (first[name] == 0)
-                first.Remove(name);
-
-            if (second.ContainsKey(name))
-                second[name] += count;
-            else
-                second.Add(name, count);
         }
 
         private string CollectInformation(Dictionary<string, int> collection)
@@ -222,9 +200,8 @@ namespace online_store
 
     public interface IWarehouse
     {
-        bool TryReserve(Product product, int count);
-        void Reserve(Product product, int count);
-        void CancelReservation(Product product, int count);
+        bool CanReserve(Product product, int count);
+
         void DeleteProducts(IReadOnlyDictionary<string, int> products);
     }
 
@@ -239,7 +216,7 @@ namespace online_store
             _products = new Dictionary<string, int>();
         }
 
-        public void AcceptProducts(Product product, int count)
+        public void AddProducts(Product product, int count)
         {
             if (product == null)
                 throw new ArgumentNullException(nameof(product));
@@ -247,27 +224,8 @@ namespace online_store
             if (count < 0)
                 throw new ArgumentOutOfRangeException(nameof(count));
 
-            if (_products.ContainsKey(product.Name))
-                count -= _products[product.Name];
-
-            if (count > 0)
-            {
-                if (_warehouse.TryReserve(product, count))
-                {
-                    _warehouse.Reserve(product, count);
-                    AddProduct(product, count);
-                }
-                else
-                {
-                    throw new InvalidOperationException();
-                }
-            }
-            else if (count < 0)
-            {
-                count = Math.Abs(count);
-                _warehouse.CancelReservation(product, count);
-                RemoveProducts(product, count);
-            }
+            if (_warehouse.CanReserve(product, count))
+                AddProduct(product, count);
         }
 
         public string GetInfo()
@@ -310,14 +268,6 @@ namespace online_store
                 _products[name] += count;
             else
                 _products.Add(name, count);
-        }
-
-        private void RemoveProducts(Product product, int count)
-        {
-            _products[product.Name] -= count;
-
-            if (_products[product.Name] == 0)
-                _products.Remove(product.Name);
         }
     }
 
