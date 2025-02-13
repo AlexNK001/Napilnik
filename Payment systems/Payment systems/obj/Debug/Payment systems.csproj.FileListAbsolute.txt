@@ -1,0 +1,7 @@
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\bin\Debug\Payment systems.exe.config
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\bin\Debug\Payment systems.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\bin\Debug\Payment systems.pdb
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\obj\Debug\Payment systems.csproj.AssemblyReference.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\obj\Debug\Payment systems.csproj.CoreCompileInputs.cache
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\obj\Debug\Payment systems.exe
+C:\Users\admin\Documents\Napilnik\Napilnik\Payment systems\Payment systems\obj\Debug\Payment systems.pdb
