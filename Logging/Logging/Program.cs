@@ -9,11 +9,8 @@ public static class Program
 {
     private static void Main()
     {
-        ViewFabric viewFabric = new ViewFabric();
-        DatabaseContext databaseContext = new DatabaseContext();
-        HashCreator hashCreator = new HashCreator();
-        Repository repository = new Repository(databaseContext, hashCreator);
-        Presenter presenter = new Presenter(viewFabric, repository);
+        PresenterFabric presenterFabric = new PresenterFabric();
+        View view = new View(new TextBox(), new TextBox(), presenterFabric);
     }
 }
 
@@ -22,13 +19,9 @@ public class Presenter
     private readonly View _view;
     private readonly Repository _repository;
 
-    public Presenter(ViewFabric viewFabric, Repository repository)
+    public Presenter(View view, Repository repository)
     {
-        if (viewFabric == null)
-            throw new ArgumentNullException(nameof(viewFabric));
-        else
-            _view = viewFabric.CreateView(this);
-
+        _view = view ?? throw new ArgumentNullException(nameof(view));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     }
 
@@ -45,7 +38,7 @@ public class Presenter
             string message;
 
             if (citizen == null)
-                message = MessageStorage.EnteringPassportData;
+                message = MessageStorage.PassportNotFound;
             else
                 message = citizen.IsVoted ? MessageStorage.AccessGranted : MessageStorage.AccessNotGranted;
 
@@ -108,7 +101,7 @@ public class DatabaseContext
         catch (SQLiteException exception)
         {
             if (exception.ErrorCode != 1)
-                throw new FileNotFoundException("Файл db.sqlite не найден. Положите файл в папку вместе с exe.");
+                throw new FileNotFoundException(MessageStorage.FileNotFound);
 
             return new DataTable();
         }
@@ -147,10 +140,10 @@ public class Passport
 
         string data = rawData.Trim().Replace(" ", string.Empty);
 
-        if (data.Length == PassportDataLength)
-            Data = data;
-        else
+        if (data.Length != PassportDataLength)
             throw new InvalidOperationException(MessageStorage.InvalidInput);
+
+        Data = data;
     }
 
     public string Data { get; }
@@ -162,11 +155,11 @@ public class View
     private readonly TextBox _message;
     private readonly Presenter _presenter;
 
-    public View(TextBox passport, TextBox message, Presenter presenter)
+    public View(TextBox passport, TextBox message, PresenterFabric presenter)
     {
         _passport = passport ?? throw new ArgumentNullException(nameof(passport));
         _message = message ?? throw new ArgumentNullException(nameof(message));
-        _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
+        _presenter = presenter.CreatePresenter(this);
     }
 
     private void OnClick(object sender, EventArgs e)
@@ -191,11 +184,13 @@ public class View
     }
 }
 
-public class ViewFabric
+public class PresenterFabric
 {
-    public View CreateView(Presenter presenter)
+    public Presenter CreatePresenter(View view)
     {
-        return new View(new TextBox(), new TextBox(), presenter);
+        DatabaseContext databaseContext = new DatabaseContext();
+        HashCreator hashCreator = new HashCreator();
+        return new Presenter(view, new Repository(databaseContext, hashCreator));
     }
 }
 
